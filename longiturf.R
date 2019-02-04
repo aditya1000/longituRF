@@ -3,10 +3,10 @@ library(rpart)
 library(VSURF)
 library(Rborist)
 library(ranger)
-MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
+MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto, delta = 0.001){
   q <- dim(Z)[2]
   nind <- length(unique(id))
-  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets aléatoires de l'individu i 
+  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets al?atoires de l'individu i 
   sigmahat <- 1 #### init 
   Btilde <- diag(rep(1,q)) ### init 
   epsilonhat <- rep(0,length(Y))
@@ -22,15 +22,15 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
       h <- opti.FBM(X,Y,id,Z,iter, mtry,ntree,time)
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
         }
         
         forest <- randomForest(X,ystar,mtry=mtry,ntree=ntree, importance = TRUE) ### on construit l'arbre
-        fhat <- predict(forest) #### prédiction avec l'arbre 
+        fhat <- predict(forest) #### pr?diction avec l'arbre 
         OOB[i] <- forest$mse[ntree]
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           K <- cov.fbm(time[indiv], h)
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -40,13 +40,13 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
         }
         sigm <- sigmahat
         B <- Btilde
-        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des paramètres de la variance des effets aléatoires. 
-        ### MAJ de la volatilité du processus stochastique
+        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des param?tres de la variance des effets al?atoires. 
+        ### MAJ de la volatilit? du processus stochastique
         sigma2 <- gam_fbm(sigm,id,Z,B,time,sigma2,omega,h)
         Vrai <- c(Vrai, logV.fbm(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,h))
         if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-        if (inc<0.001) {
+        if (inc < delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat,sigma_sto=sigma2, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time =time, Hurst=h, OOB =OOB))
         }
@@ -59,15 +59,15 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
       alpha <- opti.exp(X,Y,id,Z,iter, mtry,ntree,time)
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
         }
         
         forest <- randomForest(X,ystar,mtry=mtry,ntree=ntree, importance = TRUE) ### on construit l'arbre
-        fhat <- predict(forest) #### prédiction avec l'arbre 
+        fhat <- predict(forest) #### pr?diction avec l'arbre 
         OOB[i] <- forest$mse[ntree]
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           K <- cov.exp(time[indiv], alpha)
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -77,13 +77,13 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
         }
         sigm <- sigmahat
         B <- Btilde
-        sigmahat <- sig.exp(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,alpha) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay.exp(btilde,Btilde,Z,id,sigm, time, sigma2,alpha) #### MAJ des paramètres de la variance des effets aléatoires. 
-        ### MAJ de la volatilité du processus stochastique
+        sigmahat <- sig.exp(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,alpha) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay.exp(btilde,Btilde,Z,id,sigm, time, sigma2,alpha) #### MAJ des param?tres de la variance des effets al?atoires. 
+        ### MAJ de la volatilit? du processus stochastique
         sigma2 <- gam_exp(sigm,id,Z,B,time,sigma2,omega,alpha)
         Vrai <- c(Vrai,logV.exp(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,alpha))
         if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-        if (inc<0.001) {
+        if (inc < delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time=time, alpha = alpha, OOB =OOB))
         }
@@ -94,7 +94,7 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
     if ( sto=="none"){
       for (i in 1:iter){
         ystar <- rep(NA,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,,drop=FALSE]%*%btilde[k,]
         }
@@ -102,7 +102,7 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
         forest <- randomForest(X,ystar,mtry=mtry,ntree=ntree, importance = TRUE) ### on construit l'arbre
         fhat <- predict(forest) #### 
         OOB[i] <- forest$mse[ntree]
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))
           btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
@@ -110,11 +110,11 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
         }
         
         sigm <- sigmahat
-        sigmahat <- sig(sigma = sigmahat,id = id, Z = Z, epsilon = epsilonhat,Btilde = Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay(bhat = btilde,Bhat = Btilde,Z = Z,id = id,sigmahat = sigm) #### MAJ des paramètres de la variance des effets aléatoires. 
+        sigmahat <- sig(sigma = sigmahat,id = id, Z = Z, epsilon = epsilonhat,Btilde = Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay(bhat = btilde,Bhat = Btilde,Z = Z,id = id,sigmahat = sigm) #### MAJ des param?tres de la variance des effets al?atoires. 
         Vrai <- c(Vrai, logV(Y,fhat,Z,time,id,Btilde,0,sigmahat,sto))
         if (i>1) inc <-abs((Vrai[i-1]-Vrai[i])/Vrai[i-1])
-        if (inc<0.01) {
+        if (inc < delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time=time, OOB =OOB))
         }
@@ -124,31 +124,31 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
   }
   for (i in 1:iter){
     ystar <- rep(0,length(Y))
-    for (k in 1:nind){ #### on retrace les effets aléatoires 
+    for (k in 1:nind){ #### on retrace les effets al?atoires 
       indiv <- which(id==unique(id)[k])
       ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
     
     forest <- randomForest(X,ystar,mtry=mtry,ntree=ntree, importance=TRUE) ### on construit l'arbre
-    fhat <- predict(forest) #### prédiction avec la forêt
+    fhat <- predict(forest) #### pr?diction avec la for?t
     OOB[i] <- forest$mse[ntree]
-    for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+    for (k in 1:nind){ ### calcul des effets al?atoires par individu 
       indiv <- which(id==unique(id)[k])
       K <- sto_analysis(sto,time[indiv])
       V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
       btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
-      omega[indiv] <- sigma2*K%*%solve(V)%*%(Y[indiv]-fhat[indiv]) ### prédiction processus sto
-      epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv] ### résidus 
+      omega[indiv] <- sigma2*K%*%solve(V)%*%(Y[indiv]-fhat[indiv]) ### pr?diction processus sto
+      epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv] ### r?sidus 
     }
     sigm <- sigmahat
     B <- Btilde
-    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des paramètres de la variance des effets aléatoires. 
-    ### MAJ de la volatilité du processus stochastique
+    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des param?tres de la variance des effets al?atoires. 
+    ### MAJ de la volatilit? du processus stochastique
     sigma2 <- gam_sto(sigm,id,Z,B,time,sigma2,sto,omega)
     Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,sto))
     if (i>1) inc <- abs((Vrai[i-1]-Vrai[i])/Vrai[i-1])
-    if (inc<0.01) {
+    if (inc < delta) {
       print(cat("stopped after", i, "iterations."))
       return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai,id=id, OOB =OOB))
     }
@@ -156,10 +156,10 @@ MERF <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
   return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id),omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai,id=id, OOB =OOB))
 }
 
-MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
+MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto, delta = 0.001){
   q <- dim(Z)[2]
   nind <- length(unique(id))
-  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets aléatoires de l'individu i 
+  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets al?atoires de l'individu i 
   sigmahat <- 1 #### init 
   Btilde <- diag(rep(1,q)) ### init 
   epsilonhat <- rep(0,length(Y))
@@ -174,14 +174,14 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
       h <- opti.FBM(X,Y,id,Z,iter,mtry,ntree,time)
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
         }
         
         forest <- ranger(data=cbind(X,ystar),mtry=mtry,num.trees = ntree, dependent.variable.name = "ystar", importance="impurity") ### on construit l'arbre
-        fhat <- forest$predictions #### prédiction avec l'arbre 
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        fhat <- forest$predictions #### pr?diction avec l'arbre 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           K <- cov.fbm(time[indiv], h)
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -191,13 +191,13 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
         }
         sigm <- sigmahat
         B <- Btilde
-        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des paramètres de la variance des effets aléatoires. 
-        ### MAJ de la volatilité du processus stochastique
+        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des param?tres de la variance des effets al?atoires. 
+        ### MAJ de la volatilit? du processus stochastique
         sigma2 <- gam_fbm(sigm,id,Z,B,time,sigma2,omega,h)
         Vrai <- c(Vrai, logV.fbm(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,h))
         if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-        if (inc<0.001) {
+        if (inc < delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time =time, Hurst=h))
         }
@@ -210,14 +210,14 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
       alpha <- opti.exp(X,Y,id,Z,iter,mtry,ntree,time)
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
         }
         
         forest <- ranger(data=cbind(X,ystar), dependent.variable.name = "ystar", importance="impurity") ### on construit l'arbre
-        fhat <- forest$predictions #### prédiction avec l'arbre 
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        fhat <- forest$predictions #### pr?diction avec l'arbre 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           K <- cov.exp(time[indiv], alpha)
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -227,13 +227,13 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
         }
         sigm <- sigmahat
         B <- Btilde
-        sigmahat <- sig.exp(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,alpha) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay.exp(btilde,Btilde,Z,id,sigm, time, sigma2,alpha) #### MAJ des paramètres de la variance des effets aléatoires. 
-        ### MAJ de la volatilité du processus stochastique
+        sigmahat <- sig.exp(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,alpha) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay.exp(btilde,Btilde,Z,id,sigm, time, sigma2,alpha) #### MAJ des param?tres de la variance des effets al?atoires. 
+        ### MAJ de la volatilit? du processus stochastique
         sigma2 <- gam_exp(sigm,id,Z,B,time,sigma2,omega,alpha)
         Vrai <- c(Vrai,logV.exp(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,alpha))
         if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-        if (inc<0.01) {
+        if (inc < delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time=time, alpha = alpha))
         }
@@ -244,14 +244,14 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
     if ( sto=="none"){
       for (i in 1:iter){
         ystar <- rep(NA,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,,drop=FALSE]%*%btilde[k,]
         }
         forest <- ranger(data=cbind(X,ystar),mtry=mtry,num.trees = ntree, dependent.variable.name = "ystar", importance="impurity") ### on construit l'arbre
         fhat <- forest$predictions #### 
         print(i)
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))
           btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
@@ -259,11 +259,11 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
         }
         
         sigm <- sigmahat
-        sigmahat <- sig(sigma = sigmahat,id = id, Z = Z, epsilon = epsilonhat,Btilde = Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay(bhat = btilde,Bhat = Btilde,Z = Z,id = id,sigmahat = sigm) #### MAJ des paramètres de la variance des effets aléatoires. 
+        sigmahat <- sig(sigma = sigmahat,id = id, Z = Z, epsilon = epsilonhat,Btilde = Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay(bhat = btilde,Bhat = Btilde,Z = Z,id = id,sigmahat = sigm) #### MAJ des param?tres de la variance des effets al?atoires. 
         Vrai <- c(Vrai, logV(Y,fhat,Z,time,id,Btilde,0,sigmahat,sto))
         if (i>1) inc <- abs((Vrai[i-1]-Vrai[i])/Vrai[i-1])
-        if (inc<0.01) {
+        if (inc < delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time=time))
         }
@@ -273,30 +273,30 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
   }
   for (i in 1:iter){
     ystar <- rep(0,length(Y))
-    for (k in 1:nind){ #### on retrace les effets aléatoires 
+    for (k in 1:nind){ #### on retrace les effets al?atoires 
       indiv <- which(id==unique(id)[k])
       ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
     
     forest <- ranger(data=cbind(X,ystar),mtry=mtry,num.trees = ntree, dependent.variable.name = "ystar", importance="impurity") ### on construit l'arbre
-    fhat <- forest$predictions #### prédiction avec la forêt
-    for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+    fhat <- forest$predictions #### pr?diction avec la for?t
+    for (k in 1:nind){ ### calcul des effets al?atoires par individu 
       indiv <- which(id==unique(id)[k])
       K <- sto_analysis(sto,time[indiv])
       V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
       btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
-      omega[indiv] <- sigma2*K%*%solve(V)%*%(Y[indiv]-fhat[indiv]) ### prédiction processus sto
-      epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv] ### résidus 
+      omega[indiv] <- sigma2*K%*%solve(V)%*%(Y[indiv]-fhat[indiv]) ### pr?diction processus sto
+      epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv] ### r?sidus 
     }
     sigm <- sigmahat
     B <- Btilde
-    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des paramètres de la variance des effets aléatoires. 
-    ### MAJ de la volatilité du processus stochastique
+    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des param?tres de la variance des effets al?atoires. 
+    ### MAJ de la volatilit? du processus stochastique
     sigma2 <- gam_sto(sigm,id,Z,B,time,sigma2,sto,omega)
     Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,sto))
     if (i>1) inc <- abs((Vrai[i-1]-Vrai[i])/Vrai[i-1])
-    if (inc<0.01) {
+    if (inc < delta) {
       print(cat("stopped after", i, "iterations."))
       return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai,id=id))
     }
@@ -304,7 +304,7 @@ MERFranger <- function(X,Y,id,Z,iter,mtry, ntree, time, sto){
   return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id),omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai,id=id))
 }
 
-bay_sto <- function(bhat,Bhat,Z,id, sigmahat, time, sigma2,sto){ #### actualisation des paramètres de B 
+bay_sto <- function(bhat,Bhat,Z,id, sigmahat, time, sigma2,sto){ #### actualisation des param?tres de B 
   nind <- length(unique(id))
   q <- dim(Z)[2]
   Nombre <- length(id)
@@ -319,7 +319,7 @@ bay_sto <- function(bhat,Bhat,Z,id, sigmahat, time, sigma2,sto){ #### actualisat
   return(D)
 }
 
-sig_sto <- function(sigma,id,Z, epsilon, Btilde, time, sigma2,sto){ #### fonction d'actualisation du paramètre de la variance des erreurs 
+sig_sto <- function(sigma,id,Z, epsilon, Btilde, time, sigma2,sto){ #### fonction d'actualisation du param?tre de la variance des erreurs 
   nind <- length(unique(id))
   Nombre <- length(id)
   sigm <- 0
@@ -588,7 +588,7 @@ sto_analysis <- function(sto, time){
 }
 
 
-sig <- function(sigma,id,Z, epsilon, Btilde){ #### fonction d'actualisation du paramètre de la variance des erreurs 
+sig <- function(sigma,id,Z, epsilon, Btilde){ #### fonction d'actualisation du param?tre de la variance des erreurs 
   nind <- length(unique(id))
   Nombre <- length(id)
   sigm <- 0
@@ -601,7 +601,7 @@ sig <- function(sigma,id,Z, epsilon, Btilde){ #### fonction d'actualisation du p
   return(sigm)
 }
 
-bay <- function(bhat,Bhat,Z,id, sigmahat){ #### actualisation des paramètres de B 
+bay <- function(bhat,Bhat,Z,id, sigmahat){ #### actualisation des param?tres de B 
   nind <- length(unique(id))
   q <- dim(Z)[2]
   Nombre <- length(id)
@@ -628,11 +628,11 @@ Moy <- function(id,Btilde,sigmahat,Phi,Y,Z){
   return(solve(S1)%*%S2)
 }
 
-##### créer une fonction de prédiction
-REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
+##### cr?er une fonction de pr?diction
+REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto, delta = 0.001){
   q <- dim(Z)[2]
   nind <- length(unique(id))
-  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets aléatoires de l'individu i 
+  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets al?atoires de l'individu i 
   sigmahat <- 1 #### init 
   Btilde <- diag(rep(1,q)) ### init 
   epsilonhat <- 0
@@ -648,7 +648,7 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
       h <- opti.FBMreem(X,Y,id,Z,iter, mtry,ntree,time)
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
         }
@@ -678,7 +678,7 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
           fhat[k] <- mean(matrice.pred[k,-w])
         }
         
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           K <- cov.fbm(time[indiv],h)
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -688,13 +688,13 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
         }
         sigm <- sigmahat
         B <- Btilde
-        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des paramètres de la variance des effets aléatoires. 
-        ### MAJ de la volatilité du processus stochastique
+        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des param?tres de la variance des effets al?atoires. 
+        ### MAJ de la volatilit? du processus stochastique
         sigma2 <- gam_fbm(sigm,id,Z,B,time,sigma2,omega,h)
         Vrai <- c(Vrai, logV.fbm(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,h))
         if (i>1) inc <- abs(Vrai[i-1]-Vrai[i])/abs(Vrai[i-1])
-        if (inc<0.01) {
+        if (inc< delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time =time, Hurst=h, OOB =OOB))
         }
@@ -705,7 +705,7 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
     if ( sto=="none"){
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]
         }
@@ -736,7 +736,7 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
           fhat[k] <- mean(matrice.pred[k,-w])
         }
         
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))
           btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
@@ -744,11 +744,11 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
         }
         
         sigm <- sigmahat
-        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des paramètres de la variance des effets aléatoires. 
+        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des param?tres de la variance des effets al?atoires. 
         Vrai <- c(Vrai, logV(Y,fhat,Z,time,id,Btilde,0,sigmahat,sto))
         if (i>1) inc <- abs((Vrai[i-1]-Vrai[i])/Vrai[i-1])
-        if (inc<0.01) {
+        if (inc< delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time =time, OOB =OOB))
         }
@@ -759,7 +759,7 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
   for (i in 1:iter){
     
     ystar <- rep(0,length(Y))
-    for (k in 1:nind){ #### on retrace les effets aléatoires 
+    for (k in 1:nind){ #### on retrace les effets al?atoires 
       indiv <- which(id==unique(id)[k])
       ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
@@ -790,7 +790,7 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
       fhat[k] <- mean(matrice.pred[k,-w])
     }
     
-    for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+    for (k in 1:nind){ ### calcul des effets al?atoires par individu 
       indiv <- which(id==unique(id)[k])
       K <- sto_analysis(sto,time[indiv])
       V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -800,15 +800,15 @@ REEMforest <- function(X,Y,id,Z,iter,mtry,ntree, time, sto){
     }
     sigm <- sigmahat
     B <- Btilde
-    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des paramètres de la variance des effets aléatoires. 
-    ### MAJ de la volatilité du processus stochastique
+    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des param?tres de la variance des effets al?atoires. 
+    ### MAJ de la volatilit? du processus stochastique
     sigma2 <- gam_sto(sigm,id,Z,B,time,sigma2,sto,omega)
     Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,sto))
     if (i>1) {inc <- abs((Vrai[i-1]-Vrai[i])/Vrai[i-1])
     if (Vrai[i]<Vrai[i-1]) {reemfouille <- list(forest=forest,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai,id=id, OOB =OOB)}
     }
-    if (inc<0.01) {
+    if (inc< delta) {
       print(cat("stopped after", i, "iterations."))
       return(reemfouille)
     }
@@ -827,7 +827,7 @@ Moy_sto <- function(id,Btilde,sigmahat,Phi,Y,Z, sto, time, sigma2){
     S1 <- S1 + t(Phi[w,, drop=FALSE])%*%solve(V)%*%Phi[w,, drop=FALSE]
     S2 <- S2 + t(Phi[w,, drop=FALSE])%*%solve(V)%*%Y[w]
   }
- return(solve(S1)%*%S2)
+  return(solve(S1)%*%S2)
 }
 
 Moy_exp <- function(id,Btilde,sigmahat,Phi,Y,Z, alpha, time, sigma2){
@@ -858,10 +858,10 @@ Moy_fbm <- function(id,Btilde,sigmahat,Phi,Y,Z, H, time, sigma2){
   return(solve(S1)%*%S2)
 }
 
-MERT <- function(X,Y,id,Z,iter,time, sto){
+MERT <- function(X,Y,id,Z,iter,time, sto, delta = 0.001){
   q <- dim(Z)[2]
   nind <- length(unique(id))
-  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets aléatoires de l'individu i 
+  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets al?atoires de l'individu i 
   sigmahat <- 1 #### init 
   Btilde <- diag(rep(1,q)) ### init 
   epsilonhat <- 0
@@ -871,30 +871,31 @@ MERT <- function(X,Y,id,Z,iter,time, sto){
   sigma2 <- 1
   inc <- 1
   Vrai <- NULL
+  id_omega=sto
   
   if (class(sto)=="character"){
     if ( sto=="none"){
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]
         }
         
         tree <- rpart(ystar~.,as.data.frame(X)) ### on construit l'arbre
-        fhat <- predict(tree, as.data.frame(X)) #### prédiction avec l'arbre 
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        fhat <- predict(tree, as.data.frame(X)) #### pr?diction avec l'arbre 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))
           btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
           epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]
         }
         sigm <- sigmahat
-        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des paramètres de la variance des effets aléatoires. 
+        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des param?tres de la variance des effets al?atoires. 
         Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,0,sigmahat,"none"))
         if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-        if (inc<0.01) {
+        if (inc< delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, Vraisemblance = Vrai, id =id, time=time))
         }
@@ -904,14 +905,14 @@ MERT <- function(X,Y,id,Z,iter,time, sto){
   }
   for (i in 1:iter){
     ystar <- rep(0,length(Y))
-    for (k in 1:nind){ #### on retrace les effets aléatoires 
+    for (k in 1:nind){ #### on retrace les effets al?atoires 
       indiv <- which(id==unique(id)[k])
       ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
     
     tree <- rpart(ystar~.,X) ### on construit l'arbre
-    fhat <- predict(tree, X) #### prédiction avec l'arbre  
-    for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+    fhat <- predict(tree, X) #### pr?diction avec l'arbre  
+    for (k in 1:nind){ ### calcul des effets al?atoires par individu 
       indiv <- which(id==unique(id)[k])
       K <- sto_analysis(sto,time[indiv])
       V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -919,27 +920,27 @@ MERT <- function(X,Y,id,Z,iter,time, sto){
       omega[indiv] <- sigma2*K%*%solve(V)%*%(Y[indiv]-fhat[indiv]-Z[indiv,,drop=FALSE]%*%btilde[k,])
       epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
-    #### prédiction du processus stochastique: 
+    #### pr?diction du processus stochastique: 
     sigm <- sigmahat
     B <- Btilde
-    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des paramètres de la variance des effets aléatoires. 
-    ### MAJ de la volatilité du processus stochastique
+    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des param?tres de la variance des effets al?atoires. 
+    ### MAJ de la volatilit? du processus stochastique
     sigma2 <- gam_sto(sigm,id,Z,B,time,sigma2,sto,omega)
     Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,sto))
     if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-    if (inc<0.01) {
+    if (inc< delta) {
       print(cat("stopped after", i, "iterations."))
-      return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id),omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai, id = id))
+      return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat,id_omega=id_omega, id_btilde=unique(id),omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai, id = id))
     }
-}
-return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id),omega=omega, sigma_sto =sigma2, time = time, sto= sto, Vraisemblance=Vrai, id=id))
+  }
+  return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id),id_omega=id_omega,omega=omega, sigma_sto =sigma2, time = time, sto= sto, Vraisemblance=Vrai, id=id))
 }
 
-REEMtree <- function(X,Y,id,Z,iter, time, sto){
+REEMtree <- function(X,Y,id,Z,iter, time, sto, delta = 0.001){
   q <- dim(Z)[2]
   nind <- length(unique(id))
-  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets aléatoires de l'individu i 
+  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets al?atoires de l'individu i 
   sigmahat <- 1 #### init 
   Btilde <- diag(rep(1,q)) ### init 
   epsilonhat <- 0
@@ -949,13 +950,13 @@ REEMtree <- function(X,Y,id,Z,iter, time, sto){
   sigma2 <- 1
   Vrai <- NULL 
   inc <- 1
-  id_omega <-id
+  id_omega=sto
   
   if (class(sto)=="character"){
     if ( sto=="none"){
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]
         }
@@ -978,18 +979,18 @@ REEMtree <- function(X,Y,id,Z,iter, time, sto){
           tree$frame[w,5] <- beta[k]
         }
         fhat <- predict(tree, as.data.frame(X))
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))
           btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
           epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]
         }
         sigm <- sigmahat
-        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des paramètres de la variance des effets aléatoires. 
+        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des param?tres de la variance des effets al?atoires. 
         Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,0,sigmahat,sto))
         if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-        if (inc < 0.01) {
+        if (inc <  delta) {
           print(cat("stopped after", i, "iterations."))
           return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto, vraisemblance = Vrai,id=id, time=time))
         }
@@ -999,7 +1000,7 @@ REEMtree <- function(X,Y,id,Z,iter, time, sto){
   }
   for (i in 1:iter){
     ystar <- rep(0,length(Y))
-    for (k in 1:nind){ #### on retrace les effets aléatoires 
+    for (k in 1:nind){ #### on retrace les effets al?atoires 
       indiv <- which(id==unique(id)[k])
       ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
@@ -1022,7 +1023,7 @@ REEMtree <- function(X,Y,id,Z,iter, time, sto){
       tree$frame[w,5] <- beta[k]
     }
     fhat <- predict(tree, X)  
-    for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+    for (k in 1:nind){ ### calcul des effets al?atoires par individu 
       indiv <- which(id==unique(id)[k])
       K <- sto_analysis(sto,time[indiv])
       V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
@@ -1030,17 +1031,17 @@ REEMtree <- function(X,Y,id,Z,iter, time, sto){
       omega[indiv] <- sigma2*K%*%solve(V)%*%(Y[indiv]-fhat[indiv])
       epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
-    #### prédiction du processus stochastique: 
+    #### pr?diction du processus stochastique: 
     sigm <- sigmahat
     B <- Btilde
-    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des paramètres de la variance des effets aléatoires. 
+    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des param?tres de la variance des effets al?atoires. 
     sigma2 <- gam_sto(sigm,id,Z,B,time,sigma2,sto,omega)
     Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,sto))
     if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-    if (inc<0.01) {
+    if (inc< delta) {
       print(cat("stopped after", i, "iterations."))
-      return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai,id=id))
+      return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), id_omega=id_omega, omega=omega, sigma_sto =sigma2, time = time, sto= sto,Vraisemblance=Vrai,id=id))
     }
   }
   return(list(forest=tree,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), id_omega=id_omega,omega=omega, sigma_sto =sigma2, time = time, sto= sto, Vraisemblance=Vrai, id=id))
@@ -1061,12 +1062,12 @@ Moy_fbm <- function(id,Btilde,sigmahat,Phi,Y,Z, H, time, sigma2){
 }
 
 g <- function(s,t) { 1/abs(s-t)}
-#### faire le modèle linéaire mixte stochastique :::: 
+#### faire le mod?le lin?aire mixte stochastique :::: 
 
-Linmix <- function(X,Y,id,Z,iter, time, sto){
+Linmix <- function(X,Y,id,Z,iter, time, sto, delta = 0.001){
   q <- dim(Z)[2]
   nind <- length(unique(id))
-  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets aléatoires de l'individu i 
+  btilde <- matrix(0,nind,q) #### Pour la ligne i, on a les effets al?atoires de l'individu i 
   sigmahat <- 1 #### init 
   if (q==1) Btilde <- 1
   if (q>1) Btilde <- diag(rep(1,q)) ### init 
@@ -1083,20 +1084,20 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
       h <- opti.FBM(X,Y,id,Z,iter, mtry,ntree,time)
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,]%*%btilde[k,]- omega[indiv]
         }
         
         beta <- Moy_fbm(id,Btilde,sigmahat,X,Y,Z,H,time,sigma2) ### fit des feuilles 
         fhat <- X%*%beta 
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           K <- cov.fbm(time[indiv], h)
           V <- Z[indiv,]%*%Btilde%*%t(Z[indiv,])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
           btilde[k,] <- Btilde%*%t(Z[indiv,])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
         }
-        #### prédiction du processus stochastique: 
+        #### pr?diction du processus stochastique: 
         for (k in 1:length(id_btilde)){
           indiv <- which(id==unique(id)[k])
           K <- cov.fbm(time[indiv], h)
@@ -1110,9 +1111,9 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
         }
         sigm <- sigmahat
         B <- Btilde
-        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des paramètres de la variance des effets aléatoires. 
-        ### MAJ de la volatilité du processus stochastique
+        sigmahat <- sig.fbm(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,h) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay.fbm(btilde,Btilde,Z,id,sigm, time, sigma2,h) #### MAJ des param?tres de la variance des effets al?atoires. 
+        ### MAJ de la volatilit? du processus stochastique
         sigma2 <- gam_sto(sigm,id,Z,B,time,sigma2,omega,id_omega,h)
       }
       return(list(beta=beta,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), id_omega=id_omega,omega=omega, sigma_sto =sigma2, time = Tiime, sto= sto, Hurst =h))
@@ -1123,20 +1124,20 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
       alpha <- opti.exp(X,Y,id,Z,iter, mtry,ntree,time)
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,]%*%btilde[k,]- omega[k,which(id_omega[k,]==1)]
         }
         
         beta <- Moy_exp(id,Btilde,sigmahat,X,Y,Z,alpha,time,sigma2) ### fit des feuilles 
         fhat <- X%*%beta
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           K <- cov.exp(time[indiv], alpha)
           V <- Z[indiv,]%*%Btilde%*%t(Z[indiv,])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
           btilde[k,] <- Btilde%*%t(Z[indiv,])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
         }
-        #### prédiction du processus stochastique: 
+        #### pr?diction du processus stochastique: 
         for (k in 1:length(id_btilde)){
           indiv <- which(id==unique(id)[k])
           K <- cov.exp(time[indiv], alpha)
@@ -1150,9 +1151,9 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
         }
         sigm <- sigmahat
         B <- Btilde
-        sigmahat <- sig.exp(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,alpha) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay.exp(btilde,Btilde,Z,id,sigm, time, sigma2,alpha) #### MAJ des paramètres de la variance des effets aléatoires. 
-        ### MAJ de la volatilité du processus stochastique
+        sigmahat <- sig.exp(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,alpha) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay.exp(btilde,Btilde,Z,id,sigm, time, sigma2,alpha) #### MAJ des param?tres de la variance des effets al?atoires. 
+        ### MAJ de la volatilit? du processus stochastique
         sigma2 <- gam_exp(sigm,id,Z,B,time,sigma2,omega,id_omega,apha)
       }
       return(list(beta = beta,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), id_omega=id_omega,omega=omega, sigma_sto =sigma2, time = Tiime, sto= sto, alpha=alpha))
@@ -1161,14 +1162,14 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
     if ( sto=="none"){
       for (i in 1:iter){
         ystar <- rep(0,length(Y))
-        for (k in 1:nind){ #### on retrace les effets aléatoires 
+        for (k in 1:nind){ #### on retrace les effets al?atoires 
           indiv <- which(id==unique(id)[k])
           ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]
         }
         
         beta <- Moy(id,Btilde,sigmahat,X,Y,Z) ### fit des feuilles 
         fhat <- X%*%beta
-        for (k in 1:nind){ ### calcul des effets aléatoires par individu 
+        for (k in 1:nind){ ### calcul des effets al?atoires par individu 
           indiv <- which(id==unique(id)[k])
           V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))
           btilde[k,] <- Btilde%*%t(Z[indiv,,drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
@@ -1179,8 +1180,8 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
           epsilonhat[indiv] <- Y[indiv] -fhat[indiv] -Z[indiv,, drop=FALSE]%*%btilde[k,]
         }
         sigm <- sigmahat
-        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des paramètres de la variance des effets aléatoires.
+        sigmahat <- sig(sigmahat,id, Z, epsilonhat, Btilde) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+        Btilde  <- bay(btilde,Btilde,Z,id,sigm) #### MAJ des param?tres de la variance des effets al?atoires.
         
       }
       return(list(beta=beta,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id), sto= sto))
@@ -1188,7 +1189,7 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
   }
   for (i in 1:iter){
     ystar <- rep(0,length(Y))
-    for (k in 1:nind){ #### on retrace les effets aléatoires 
+    for (k in 1:nind){ #### on retrace les effets al?atoires 
       indiv <- which(id==unique(id)[k])
       ystar[indiv] <- Y[indiv]- Z[indiv,, drop=FALSE]%*%btilde[k,]- omega[indiv]
     }
@@ -1202,7 +1203,7 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
       V <- Z[indiv,, drop=FALSE]%*%Btilde%*%t(Z[indiv,, drop=FALSE])+diag(as.numeric(sigmahat),length(indiv),length(indiv))+ sigma2*K
       btilde[k,] <- Btilde%*%t(Z[indiv,, drop=FALSE])%*%solve(V)%*%(Y[indiv]-fhat[indiv])
     }
-    #### prédiction du processus stochastique: 
+    #### pr?diction du processus stochastique: 
     for (k in 1:length(unique(id))){
       indiv <- which(id==unique(id)[k])
       K <- sto_analysis(sto,time[indiv])
@@ -1216,13 +1217,13 @@ Linmix <- function(X,Y,id,Z,iter, time, sto){
     }
     sigm <- sigmahat
     B <- Btilde
-    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le problème ! 
-    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des paramètres de la variance des effets aléatoires. 
-    ### MAJ de la volatilité du processus stochastique
+    sigmahat <- sig_sto(sigmahat,id, Z, epsilonhat, Btilde, time, sigma2,sto) ##### MAJ de la variance des erreurs ! ici que doit se trouver le probl?me ! 
+    Btilde  <- bay_sto(btilde,Btilde,Z,id,sigm, time, sigma2,sto) #### MAJ des param?tres de la variance des effets al?atoires. 
+    ### MAJ de la volatilit? du processus stochastique
     sigma2 <- gam_sto(sigm,id,Z,B,time,sigma2,sto,omega)
     Vrai <- c(Vrai, logV(Y,fhat,Z[,,drop=FALSE],time,id,Btilde,sigma2,sigmahat,sto))
     if (i>1) inc <- (Vrai[i-1]-Vrai[i])/Vrai[i-1]
-    if (inc<0.01) {
+    if (inc< delta) {
       print(cat("stopped after", i, "iterations."))
       return(list(beta=beta,random_effects=btilde,var_random_effects=Btilde,sigma=sigmahat, id_btilde=unique(id),omega=omega, sigma_sto =sigma2, time = Tiime, sto= sto,Vraisemblance=Vrai))
     }
